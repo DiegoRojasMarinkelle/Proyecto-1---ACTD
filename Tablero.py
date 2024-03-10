@@ -10,9 +10,11 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 server = app.server
 
-df = pd.read_csv('https://plotly.github.io/datasets/country_indicators.csv')
+df = pd.read_csv('data.txt', sep=',')
+df['quarter'] = df['quarter'].str.replace("quarter", "", case=False)
+df['quarter'] = pd.to_numeric(df['quarter'])
 
-available_indicators = df['Indicator Name'].unique()
+caracteristicas = df.columns
 
 app.layout = html.Div([
     html.Div([
@@ -20,8 +22,8 @@ app.layout = html.Div([
         html.Div([
             dcc.Dropdown(
                 id='xaxis-column',
-                options=[{'label': i, 'value': i} for i in available_indicators],
-                value='Fertility rate, total (births per woman)'
+                options=[{'label': i, 'value': i} for i in caracteristicas],
+                value='no_of_workers'
             ),
             dcc.RadioItems(
                 id='xaxis-type',
@@ -35,8 +37,8 @@ app.layout = html.Div([
         html.Div([
             dcc.Dropdown(
                 id='yaxis-column',
-                options=[{'label': i, 'value': i} for i in available_indicators],
-                value='Life expectancy at birth, total (years)'
+                options = [{'label': i, 'value': i} for i in caracteristicas if i in ['actual_productivity', 'targeted_productivity', 'over_time']],
+                value='actual_productivity'
             ),
             dcc.RadioItems(
                 id='yaxis-type',
@@ -49,12 +51,12 @@ app.layout = html.Div([
 
     dcc.Graph(id='indicator-graphic'),
 
-    dcc.Slider(
-        id='year--slider',
-        min=df['Year'].min(),
-        max=df['Year'].max(),
-        value=df['Year'].max(),
-        marks={str(year): str(year) for year in df['Year'].unique()},
+    dcc.RangeSlider(
+        id='Cuarto - Quarter',
+        min=1,
+        max=len(df['quarter'].unique()),
+        value=[1, len(df['quarter'].unique())],
+        marks={i: str(i) for i in range(1, len(df['quarter'].unique()) + 1)},
         step=None
     )
 ])
@@ -65,15 +67,15 @@ app.layout = html.Div([
      Input('yaxis-column', 'value'),
      Input('xaxis-type', 'value'),
      Input('yaxis-type', 'value'),
-     Input('year--slider', 'value')])
+     Input('Cuarto - Quarter', 'value')])
 def update_graph(xaxis_column_name, yaxis_column_name,
                  xaxis_type, yaxis_type,
-                 year_value):
-    dff = df[df['Year'] == year_value]
+                 quarter_value):
+    dff = df[df['quarter'].between(quarter_value[0], quarter_value[1])] 
 
-    fig = px.scatter(x=dff[dff['Indicator Name'] == xaxis_column_name]['Value'],
-                     y=dff[dff['Indicator Name'] == yaxis_column_name]['Value'],
-                     hover_name=dff[dff['Indicator Name'] == yaxis_column_name]['Country Name'])
+    fig = px.scatter(x=dff[xaxis_column_name],
+                     y=dff[yaxis_column_name],
+                     hover_name=dff['actual_productivity'])
 
     fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
 
