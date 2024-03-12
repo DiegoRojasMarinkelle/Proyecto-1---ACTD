@@ -18,19 +18,12 @@ caracteristicas = df.columns
 
 app.layout = html.Div([
     html.Div([
-
         html.Div([
             dcc.Dropdown(
                 id='xaxis-column',
                 options=[{'label': i, 'value': i} for i in caracteristicas],
                 value='no_of_workers'
             ),
-            dcc.RadioItems(
-                id='xaxis-type',
-                options=[{'label': i, 'value': i} for i in ['Linear', 'Log']],
-                value='Linear',
-                labelStyle={'display': 'inline-block'}
-            )
         ],
         style={'width': '48%', 'display': 'inline-block'}),
 
@@ -40,48 +33,55 @@ app.layout = html.Div([
                 options=[{'label': i, 'value': i} for i in caracteristicas if i in ['actual_productivity', 'targeted_productivity', 'over_time']],
                 value='actual_productivity'
             ),
-            dcc.RadioItems(
-                id='yaxis-type',
-                options=[{'label': i, 'value': i} for i in ['Linear', 'Log']],
-                value='Linear',
-                labelStyle={'display': 'inline-block'}
-            )
-        ], style={'width': '48%', 'float': 'right', 'display': 'inline-block'}),
+        ], 
+        style={'width': '48%', 'float': 'right', 'display': 'inline-block'}),
 
+        dcc.Checklist(
+            id='series-checklist',
+            options=[
+                {'label': 'Actual Productivity', 'value': 'actual_productivity_serie'},
+                {'label': 'Targeted Productivity', 'value': 'targeted_productivity_serie'}
+            ],
+            value=['actual_productivity_serie', 'targeted_productivity_serie']
+        ),
+        
+        dcc.Graph(id='Grafica_Analisis'),
+        dcc.RangeSlider(
+            id='Cuarto - Quarter',
+            min=1,
+            max=len(df['quarter'].unique()),
+            value=[1, len(df['quarter'].unique())],
+            marks={i: str(i) for i in range(1, len(df['quarter'].unique()) + 1)},
+            step=None,
+            tooltip={'placement': 'bottom', 'always_visible': True},
+        )
+
+    ], style={'width': '50%', 'display': 'inline-block'}),
+
+    html.Div([
+
+        # Parte superior derecha: Gráficos de análisis univariado
         html.Div([
-            dcc.Checklist(
-                id='series-checklist',
-                options=[
-                    {'label': 'Productividad Real', 'value': 'actual_productivity_serie'},
-                    {'label': 'Productividad Objetivo', 'value': 'targeted_productivity_serie'}
-                ],
-                value=['first_series', 'second_series']
-            )
-        ], style={'margin-top': '20px'})
-    ]),
+            dcc.Graph(id='Analisis univariado 1'),
+            dcc.Graph(id='Analisis univariado 2')
+        ], style={'width': '100%', 'display': 'inline-block', 'margin-top': '20px'}),
 
-    dcc.Graph(id='indicator-graphic'),
+        # Parte inferior derecha: Otro gráfico
+        html.Div([
+            dcc.Graph(id='Grafico de torta')
+        ], style={'width': '100%', 'display': 'inline-block', 'margin-top': '20px'})
 
-    dcc.RangeSlider(
-        id='Cuarto - Quarter',
-        min=1,
-        max=len(df['quarter'].unique()),
-        value=[1, len(df['quarter'].unique())],
-        marks={i: str(i) for i in range(1, len(df['quarter'].unique()) + 1)},
-        step=None
-    )
+    ], style={'width': '50%', 'float': 'right', 'display': 'inline-block'})
 ])
 
+
 @app.callback(
-    Output('indicator-graphic', 'figure'),
+    Output('Grafica_Analisis', 'figure'),
     [Input('xaxis-column', 'value'),
      Input('yaxis-column', 'value'),
-     Input('xaxis-type', 'value'),
-     Input('yaxis-type', 'value'),
      Input('Cuarto - Quarter', 'value'),
      Input('series-checklist', 'value')])
 def update_graph(xaxis_column_name, yaxis_column_name,
-                 xaxis_type, yaxis_type,
                  quarter_value, selected_series):
     dff = df[df['quarter'].between(quarter_value[0], quarter_value[1])] 
 
@@ -93,18 +93,11 @@ def update_graph(xaxis_column_name, yaxis_column_name,
                                  hover_name=dff['department']).data[0])
 
     if 'targeted_productivity_serie' in selected_series:
-        second_trace = px.scatter(x=dff[xaxis_column_name],
+        fig.add_trace(px.scatter(x=dff[xaxis_column_name],
                                   y=dff['targeted_productivity'],
-                                  hover_name=dff['department'], color_discrete_sequence=['orange']).data[0]
-        fig.add_trace(second_trace)
+                                  hover_name=dff['department'], color_discrete_sequence=['orange']).data[0])
 
     fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
-
-    fig.update_xaxes(title=xaxis_column_name, 
-                     type='linear' if xaxis_type == 'Linear' else 'log') 
-
-    fig.update_yaxes(title=yaxis_column_name, 
-                     type='linear' if yaxis_type == 'Linear' else 'log') 
 
     return fig
 
