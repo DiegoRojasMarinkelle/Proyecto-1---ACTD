@@ -37,7 +37,7 @@ app.layout = html.Div([
         html.Div([
             dcc.Dropdown(
                 id='yaxis-column',
-                options = [{'label': i, 'value': i} for i in caracteristicas if i in ['actual_productivity', 'targeted_productivity', 'over_time']],
+                options=[{'label': i, 'value': i} for i in caracteristicas if i in ['actual_productivity', 'targeted_productivity', 'over_time']],
                 value='actual_productivity'
             ),
             dcc.RadioItems(
@@ -46,7 +46,18 @@ app.layout = html.Div([
                 value='Linear',
                 labelStyle={'display': 'inline-block'}
             )
-        ],style={'width': '48%', 'float': 'right', 'display': 'inline-block'})
+        ], style={'width': '48%', 'float': 'right', 'display': 'inline-block'}),
+
+        html.Div([
+            dcc.Checklist(
+                id='series-checklist',
+                options=[
+                    {'label': 'Productividad Real', 'value': 'actual_productivity_serie'},
+                    {'label': 'Productividad Objetivo', 'value': 'targeted_productivity_serie'}
+                ],
+                value=['first_series', 'second_series']
+            )
+        ], style={'margin-top': '20px'})
     ]),
 
     dcc.Graph(id='indicator-graphic'),
@@ -67,15 +78,25 @@ app.layout = html.Div([
      Input('yaxis-column', 'value'),
      Input('xaxis-type', 'value'),
      Input('yaxis-type', 'value'),
-     Input('Cuarto - Quarter', 'value')])
+     Input('Cuarto - Quarter', 'value'),
+     Input('series-checklist', 'value')])
 def update_graph(xaxis_column_name, yaxis_column_name,
                  xaxis_type, yaxis_type,
-                 quarter_value):
+                 quarter_value, selected_series):
     dff = df[df['quarter'].between(quarter_value[0], quarter_value[1])] 
 
-    fig = px.scatter(x=dff[xaxis_column_name],
-                     y=dff[yaxis_column_name],
-                     hover_name=dff['actual_productivity'])
+    fig = px.scatter()
+
+    if 'actual_productivity_serie' in selected_series:
+        fig.add_trace(px.scatter(x=dff[xaxis_column_name],
+                                 y=dff['actual_productivity'],
+                                 hover_name=dff['department']).data[0])
+
+    if 'targeted_productivity_serie' in selected_series:
+        second_trace = px.scatter(x=dff[xaxis_column_name],
+                                  y=dff['targeted_productivity'],
+                                  hover_name=dff['department'], color_discrete_sequence=['orange']).data[0]
+        fig.add_trace(second_trace)
 
     fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
 
