@@ -58,20 +58,26 @@ app.layout = html.Div([
 
     ], style={'width': '50%', 'display': 'inline-block'}),
 
+html.Div([
+    # Parte superior derecha: Gráficos de análisis univariado
     html.Div([
-
-        # Parte superior derecha: Gráficos de análisis univariado
         html.Div([
-            dcc.Graph(id='Analisis univariado 1'),
+            dcc.Graph(id='Analisis univariado 1')
+        ], style={'width': '10%', 'height': '150px', 'display': 'inline-block'}),
+        html.Div([
             dcc.Graph(id='Analisis univariado 2')
-        ], style={'width': '100%', 'display': 'inline-block', 'margin-top': '20px'}),
-
-        # Parte inferior derecha: Otro gráfico
+        ], style={'width': '10%', 'height': '150px', 'display': 'inline-block'}),
         html.Div([
-            dcc.Graph(id='Grafico de torta')
-        ], style={'width': '100%', 'display': 'inline-block', 'margin-top': '20px'})
+            dcc.Graph(id='Analisis univariado 3')
+        ], style={'width': '10%', 'height': '150px', 'display': 'inline-block'}),
+    ], style={'width': '100%', 'margin-top': '0px'}),
 
-    ], style={'width': '50%', 'float': 'right', 'display': 'inline-block'})
+    # Parte inferior derecha: Otro gráfico
+    html.Div([
+        dcc.Graph(id='Grafico de torta')
+    ], style={'width': '100%', 'display': 'inline-block', 'margin-top': '20px'})
+], style={'width': '50%', 'float': 'right', 'display': 'inline-block'})
+
 ])
 
 
