@@ -1,4 +1,5 @@
 import dash
+import scipy.stats as stats
 from dash import dcc  # dash core components
 from dash import html # dash html components
 from dash.dependencies import Input, Output
@@ -17,6 +18,9 @@ df['quarter'] = pd.to_numeric(df['quarter'])
 caracteristicas = df.columns
 
 app.layout = html.Div([
+    html.Div([
+        dcc.Markdown('Análisis de alternativas')
+    ]),
     html.Div([
         dcc.Checklist(
             id='series-checklist',
@@ -45,6 +49,22 @@ app.layout = html.Div([
 html.Div([
     #Gráficos de análisis univariado
     html.Div([
+
+        
+        html.Div([
+            dcc.Graph(id='Productividad_objetivo_vs_actual')
+        ], style={'width': '50%', 'display': 'inline-block'}),
+        html.Div([
+            dcc.Graph(id='Productividad_objetivo_vs_actual_por_equipo')
+        ], style={'width': '50%', 'display': 'inline-block'}),
+        html.Div([
+            dcc.Graph(id='Productividad_actual')
+        ], style={'width': '50%', 'display': 'inline-block'}),
+        html.Div([
+            dcc.Graph(id='Productividad_objetivo')
+        ], style={'width': '50%', 'display': 'inline-block'}),
+        html.Div([
+            dcc.Markdown("Análisis univariado - Preguntas 1 a 9")]),
         html.Div([
             dcc.Dropdown(
                 id='xaxis-column',
@@ -55,39 +75,18 @@ html.Div([
         style={'width': '48%', 'display': 'inline-block'}),
 
         html.Div([
-            dcc.Dropdown(
+        dcc.Dropdown(
                 id='yaxis-column',
                 options=[{'label': i, 'value': i} for i in caracteristicas if i in ['actual_productivity', 'targeted_productivity', 'over_time']],
                 value='actual_productivity'
             ),
         ], 
         style={'width': '48%', 'float': 'right', 'display': 'inline-block'}),
-        
-        html.Div([
-            dcc.Graph(id='Productividad_objetivo_vs_actual')
-        ], style={'width': '100%', 'display': 'inline-block'}),
-        html.Div([
-            dcc.Graph(id='Productividad_actual')
-        ], style={'width': '50%', 'display': 'inline-block'}),
-        html.Div([
-            dcc.Graph(id='Productividad_objetivo')
-        ], style={'width': '50%', 'display': 'inline-block'}),
         html.Div([
             dcc.Graph(id='Análisis_univariado')
         ], style={'width': '100%', 'display': 'inline-block'}),
-        html.Div([
-            dcc.Graph(id='no_of_style_change')
-        ], style={'width': '10%', 'display': 'inline-block'}), 
-        html.Div([
-            dcc.Graph(id='targeted_productivity')
-        ], style={'width': '10%', 'display': 'inline-block'}), 
     ], style={'width': '100%', 'display': 'inline-block'}),  
 
-    
-    # Parte inferior derecha: Otro gráfico
-    html.Div([
-        dcc.Graph(id='Grafico de torta1')
-    ], style={'width': '100%', 'display': 'inline-block'}),
 ], style={'width': '100%', 'display': 'inline-block'})
 
 
@@ -132,11 +131,16 @@ def update_graph(xaxis_column_name, yaxis_column_name,
     fig = px.scatter()
 
     fig.add_trace(px.scatter(x=dff[xaxis_column_name],
-                            y=dff[yaxis_column_name],
+                            y=dff['actual_productivity'],
                             trendline="ols",
-                            hover_name=dff['actual_productivity']).data[0])
+                            hover_name=dff['targeted_productivity']).data[0])
+    
+    correlation_coefficient, _ = stats.pearsonr(dff[xaxis_column_name], dff['targeted_productivity'])
+    correlation_text = f'Correlación: {correlation_coefficient:.2f}'
 
-    fig.update_layout(title='Grafica de análisis univariado respecto a productividad actual', title_x=0.5, margin={'l': 40, 'b': 40, 't': 30, 'r': 0}, hovermode='closest')
+    fig.update_layout(title=f'Grafica de análisis {xaxis_column_name} respecto a productividad actual. \n{correlation_text}',
+                      title_x=0.5, margin={'l': 40, 'b': 40, 't': 30, 'r': 0}, hovermode='closest')
+
 
     return fig
 
@@ -149,7 +153,27 @@ def update_graph(xaxis_column_name, yaxis_column_name, quarter_value):
     dff = df[df['quarter'].between(quarter_value[0], quarter_value[1])] 
 
     fig = px.scatter(dff, x='targeted_productivity', y='actual_productivity', color='department', 
-                     hover_name='department', title='Grafica de análisis univariado respecto a productividad actual',
+                     hover_name='department', title='Grafica de productividad actual vs objetivo por departamento',
+                     labels={'targeted_productivity': 'Productividad Objetivo', 'actual_productivity': 'Productividad Actual'})
+
+    fig.add_shape(type="line", x0=dff['targeted_productivity'].min(), y0=dff['targeted_productivity'].min(), 
+                  x1=dff['targeted_productivity'].max(), y1=dff['targeted_productivity'].max(), 
+                  line=dict(color="black", width=2, dash="dash"))
+
+    fig.update_layout(title_x=0.5, margin={'l': 40, 'b': 40, 't': 30, 'r': 0}, hovermode='closest')
+
+    return fig
+
+@app.callback(
+    Output('Productividad_objetivo_vs_actual_por_equipo', 'figure'),
+    [Input('xaxis-column', 'value'),
+     Input('yaxis-column', 'value'),
+     Input('Cuarto - Quarter', 'value')])
+def update_graph(xaxis_column_name, yaxis_column_name, quarter_value):
+    dff = df[df['quarter'].between(quarter_value[0], quarter_value[1])] 
+
+    fig = px.scatter(dff, x='targeted_productivity', y='actual_productivity', color='team', 
+                     hover_name='team', title='Grafica de productividad actual vs objetivo por equipo',
                      labels={'targeted_productivity': 'Productividad Objetivo', 'actual_productivity': 'Productividad Actual'})
 
     fig.add_shape(type="line", x0=dff['targeted_productivity'].min(), y0=dff['targeted_productivity'].min(), 
