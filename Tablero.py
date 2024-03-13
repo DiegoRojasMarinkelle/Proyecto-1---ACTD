@@ -5,6 +5,7 @@ from dash import html # dash html components
 from dash.dependencies import Input, Output
 import plotly.express as px
 import pandas as pd
+import joblib
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -14,6 +15,10 @@ server = app.server
 df = pd.read_csv('data.txt', sep=',')
 df['quarter'] = df['quarter'].str.replace("quarter", "", case=False)
 df['quarter'] = pd.to_numeric(df['quarter'])
+
+df_filtrado = df[df['actual_productivity'] < df['targeted_productivity']]
+df_alternativas = df_filtrado.drop('actual_productivity', axis = 1)
+model = joblib.load('modelo_entrenado.pkl')
 
 caracteristicas = df.columns
 
