@@ -1,5 +1,6 @@
 import dash
 import scipy.stats as stats
+import plotly.graph_objects as go
 from dash import dcc  # dash core components
 from dash import html # dash html components
 from dash.dependencies import Input, Output
@@ -17,28 +18,38 @@ df['quarter'] = df['quarter'].str.replace("quarter", "", case=False)
 df['quarter'] = pd.to_numeric(df['quarter'])
 
 df_filtrado = df[df['actual_productivity'] < df['targeted_productivity']]
-df_alternativas = df_filtrado.drop('actual_productivity', axis = 1)
+
 model = joblib.load('modelo_entrenado.pkl')
 
-caracteristicas = df.columns
+caracteristicas = ['smv', 'over_time', 'incentive', 'idle_time', 'idle_men', 'no_of_style_change', 'no_of_workers', 'wip']
 
 app.layout = html.Div([
     html.Div([
         dcc.Markdown('Análisis de alternativas')
     ]),
     html.Div([
-        dcc.Checklist(
-            id='series-checklist',
-            options=[
-                {'label': 'Actual Productivity', 'value': 'actual_productivity_serie'},
-                {'label': 'Targeted Productivity', 'value': 'targeted_productivity_serie'}
-            ],
-            value=['actual_productivity_serie', 'targeted_productivity_serie']
-        ),
-        
+        dcc.Dropdown(
+                id='yaxis-column_alternativas',
+                options=[{'label': i, 'value': i} for i in caracteristicas],
+                value='no_of_workers'
+            ),
+
         #Grafica analisis de alternativas
         dcc.Graph(id='Grafica_Analisis'),
+        dcc.Markdown("Incremento unidades variable seleccionada"),
+        dcc.Slider(
+            id='slider_alternativas',
+            min=1,
+            max=20,
+            value=len(df['quarter'].unique()) // 2,  # Set initial value to midpoint
+            marks={i: str(i) for i in range(1, 20)},
+            step=None,
+            tooltip={'placement': 'bottom', 'always_visible': True},
+        ),
+
+
         dcc.Markdown('Cuarto - Quarter'),
+
         dcc.RangeSlider(
             id='Cuarto - Quarter',
             min=1,
@@ -80,56 +91,64 @@ html.Div([
         style={'width': '48%', 'display': 'inline-block'}),
 
         html.Div([
-        dcc.Dropdown(
-                id='yaxis-column',
-                options=[{'label': i, 'value': i} for i in caracteristicas if i in ['actual_productivity', 'targeted_productivity', 'over_time']],
-                value='actual_productivity'
-            ),
-        ], 
-        style={'width': '48%', 'float': 'right', 'display': 'inline-block'}),
-        html.Div([
             dcc.Graph(id='Análisis_univariado')
         ], style={'width': '100%', 'display': 'inline-block'}),
     ], style={'width': '100%', 'display': 'inline-block'}),  
 
 ], style={'width': '100%', 'display': 'inline-block'})
 
-
-
 ])
 
 @app.callback(
     Output('Grafica_Analisis', 'figure'),
     [Input('xaxis-column', 'value'),
-     Input('yaxis-column', 'value'),
-     Input('Cuarto - Quarter', 'value'),
-     Input('series-checklist', 'value')])
-def update_graph(xaxis_column_name, yaxis_column_name,
-                 quarter_value, selected_series):
-    dff = df[df['quarter'].between(quarter_value[0], quarter_value[1])] 
+     Input('yaxis-column_alternativas', 'value'),
+     Input('slider_alternativas', 'value'),
+     Input('Cuarto - Quarter', 'value')])
+def update_graph(xaxis_column_name, yaxis_column_name, valor_slider, quarter_value):
+    dff = df[df['quarter'].between(quarter_value[0], quarter_value[1])]
+    dff_base = dff[dff['actual_productivity'] < dff['targeted_productivity']]
+    dff_filtrado = df_filtrado[df_filtrado['quarter'].between(quarter_value[0], quarter_value[1])]
+    variables_seleccionadas = ['smv', 'over_time', 'incentive', 'idle_time', 'idle_men', 'no_of_style_change', 'no_of_workers', 'wip']
+    dff_alternativas = dff_filtrado[variables_seleccionadas]
+    dff_alternativas[yaxis_column_name] = dff_alternativas[yaxis_column_name].apply(lambda x: x + valor_slider)
 
     fig = px.scatter()
 
-    if 'actual_productivity_serie' in selected_series:
-        fig.add_trace(px.scatter(x=dff[xaxis_column_name],
-                                 y=dff['actual_productivity'],
-                                 hover_name=dff['department']).data[0])
+    fig.add_trace(go.Scatter(x=dff_base['targeted_productivity'],
+                             y=dff_base['actual_productivity'],
+                             mode='markers',
+                             name='Actual Productivity',
+                             hovertext=dff_base['department'],
+                             marker=dict(color='blue')))
 
-    if 'targeted_productivity_serie' in selected_series:
-        fig.add_trace(px.scatter(x=dff[xaxis_column_name],
-                                  y=dff['targeted_productivity'],
-                                  hover_name=dff['department'], color_discrete_sequence=['orange']).data[0])
+    fig.add_trace(go.Scatter(x=dff_base['targeted_productivity'],
+                             y=model.predict(dff_alternativas),
+                             mode='markers',
+                             name='Predicted Productivity',
+                             hovertext=dff_base['department'],
+                             marker=dict(color='green')))
 
-    fig.update_layout(title='Grafica de análisis de alternativas', title_x=0.5, margin={'l': 40, 'b': 40, 't': 30, 'r': 0}, hovermode='closest')
+    fig.add_shape(type="line", x0=dff['targeted_productivity'].min(), y0=dff['targeted_productivity'].min(),
+                  x1=dff['targeted_productivity'].max(), y1=dff['targeted_productivity'].max(),
+                  line=dict(color="black", width=2, dash="dash"))
+
+    fig.update_layout(title='Grafica de análisis de alternativas',
+                      title_x=0.5,
+                      margin={'l': 40, 'b': 40, 't': 30, 'r': 0},
+                      hovermode='closest',
+                      xaxis_title='Targeted Productivity',
+                      yaxis_title='Productivity',
+                      legend_title='Productividad')
 
     return fig
+
 
 @app.callback(
     Output('Análisis_univariado', 'figure'),
     [Input('xaxis-column', 'value'),
-     Input('yaxis-column', 'value'),
      Input('Cuarto - Quarter', 'value')])
-def update_graph(xaxis_column_name, yaxis_column_name,
+def update_graph(xaxis_column_name,
                  quarter_value):
     dff = df[df['quarter'].between(quarter_value[0], quarter_value[1])] 
 
@@ -152,9 +171,8 @@ def update_graph(xaxis_column_name, yaxis_column_name,
 @app.callback(
     Output('Productividad_objetivo_vs_actual', 'figure'),
     [Input('xaxis-column', 'value'),
-     Input('yaxis-column', 'value'),
      Input('Cuarto - Quarter', 'value')])
-def update_graph(xaxis_column_name, yaxis_column_name, quarter_value):
+def update_graph(xaxis_column_name, quarter_value):
     dff = df[df['quarter'].between(quarter_value[0], quarter_value[1])] 
 
     fig = px.scatter(dff, x='targeted_productivity', y='actual_productivity', color='department', 
@@ -172,9 +190,8 @@ def update_graph(xaxis_column_name, yaxis_column_name, quarter_value):
 @app.callback(
     Output('Productividad_objetivo_vs_actual_por_equipo', 'figure'),
     [Input('xaxis-column', 'value'),
-     Input('yaxis-column', 'value'),
      Input('Cuarto - Quarter', 'value')])
-def update_graph(xaxis_column_name, yaxis_column_name, quarter_value):
+def update_graph(xaxis_column_name, quarter_value):
     dff = df[df['quarter'].between(quarter_value[0], quarter_value[1])] 
 
     fig = px.scatter(dff, x='targeted_productivity', y='actual_productivity', color='team', 
